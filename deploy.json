@@ -1,5 +1,5 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "existingVnetName": {
@@ -194,7 +194,7 @@
         },
         {
             "type": "Microsoft.Automation/automationAccounts",
-            "apiVersion": "2015-01-01-preview",
+            "apiVersion": "2015-10-31",
             "name": "[variables('autoAccountName')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
@@ -208,7 +208,7 @@
             "resources": [
                 {
                     "type": "credentials",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "AzureCredentials",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -222,7 +222,7 @@
                 },
                 {
                     "type": "credentials",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "domainJoinCredentials",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -236,7 +236,7 @@
                 },
                 {
                     "type": "runbooks",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "inputValidationRunbook",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -257,7 +257,7 @@
                 },
                 {
                     "type": "jobs",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "[variables('jobGuid0')]",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -276,7 +276,7 @@
                 },
                 {
                     "type": "runbooks",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "ServicePrincipalRunbook",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -297,7 +297,7 @@
                 },
                 {
                     "type": "jobs",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "[variables('jobGuid')]",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -317,7 +317,7 @@
                 },
                 {
                     "type": "runbooks",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "devOpsSetupRunbook",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -337,7 +337,7 @@
                 },
                 {
                     "type": "jobs",
-                    "apiVersion": "2015-01-01-preview",
+                    "apiVersion": "2015-10-31",
                     "name": "[variables('jobGuid2')]",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
@@ -424,7 +424,7 @@
         },
         {
             "type": "Microsoft.KeyVault/vaults/secrets",
-            "apiVersion": "2015-06-01",
+            "apiVersion": "2016-10-01",
             "name": "[concat(variables('keyvaultName'), '/', variables('AdminPasswordSecret'))]",
             "properties": {
                 "name": "[variables('AdminPasswordSecret')]",
@@ -436,7 +436,7 @@
         },
         {
             "type": "Microsoft.KeyVault/vaults/secrets",
-            "apiVersion": "2015-06-01",
+            "apiVersion": "2016-10-01",
             "name": "[concat(variables('keyvaultName'), '/azurePassword')]",
             "properties": {
                 "name": "azurePassword",
@@ -477,7 +477,7 @@
                 }
             },
             "properties": {
-                "forceUpdateTag": 1,
+                "forceUpdateTag": "1",
                 "azCliVersion": "2.0.80",
                 "arguments": "[concat(variables('devOpsName'), ' ', variables('devOpsProjectName'), ' ', parameters('azureAdminUpn'), ' ', variables('keyvaultName'))]",
                 "primaryScriptUri": "[concat(variables('_artifactsLocation'),'/ARMRunbookScripts/createDevopsPipeline.sh')]",
@@ -507,7 +507,7 @@
                 "resources": [
                 {
                     "type": "Microsoft.Compute/virtualMachines/extensions",
-                    "apiVersion": "2019-12-01",
+                    "apiVersion": "2019-07-01",
                     "name": "[concat(parameters('domainControllerVMName'),'/', 'userCreation')]",
                     "location": "[resourcegroup().location]",
                     "dependsOn": [
