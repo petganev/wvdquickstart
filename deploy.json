@@ -449,7 +449,7 @@
         {
             "name": "[variables('devOpsName')]",
             "type": "microsoft.visualstudio/account",
-            "location": "centralus",
+            "location": "canadacentral",
             "apiVersion": "2014-04-01-preview",
             "properties": {
               "operationType": "Create",
