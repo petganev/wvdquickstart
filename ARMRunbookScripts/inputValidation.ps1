@@ -58,14 +58,14 @@ if ($identityApproach -eq 'Azure AD DS') {
 	}
 	Catch {
 		Write-Error "Invalid domain join username or password entered - Connecting to Azure AD failed."
-		Throw 
+		Throw "Invalid domain join username or password entered - Connecting to Azure AD failed."
 	}
 
-	$GroupObjectId = Get-AzureADGroup -Filter "DisplayName eq 'AAD DC Administrators'" | Select-Object ObjectId
-	$groupMember = Get-AzureADGroupMember -ObjectId $GroupObjectId.ObjectId | Where-Object {$_.UserPrincipalName -eq $domainCredentials.username}
-	if ($groupMember -eq $null) {
+	$GroupObject = Get-AzureADGroup -Filter "DisplayName eq 'AAD DC Administrators'"  | Select-Object -First 1
+	$groupMember = Get-AzureADGroupMember -ObjectId $GroupObject.ObjectId | Where-Object {$_.UserPrincipalName -eq $domainCredentials.username}
+	if ($null -eq $groupMember) {
 		Write-Error "Entered domain join credentials correspond to a user that is not a member of the AAD DC Administrators group."
-		Throw 
+		Throw "Entered domain join credentials correspond to a user that is not a member of the AAD DC Administrators group."
 	}
 	Disconnect-AzureAD
 	Write-Output "Domain join user is a member of AAD DC administrators and the entered credentials are correct."
@@ -83,54 +83,42 @@ Connect-AzAccount -Environment 'AzureCloud' -Credential $AzCredentials
 Select-AzSubscription -SubscriptionId $SubscriptionId
 
 $context = Get-AzContext
-if ($context -eq $null)
+if ($null -eq $context)
 {
 	Write-Error "Please authenticate to Azure & Azure AD using Login-AzAccount and Connect-AzureAD cmdlets and then run this script"
-	throw
+	throw "Please authenticate to Azure & Azure AD using Login-AzAccount and Connect-AzureAD cmdlets and then run this script"
 }
 $AADUsername = $context.Account.Id
 
 #region connect to Azure and check if Owner
-Try {
-	Write-Output "Try to connect AzureAD."
-	Connect-AzureAD -Credential $AzCredentials
-	
-	Write-Output "Connected to AzureAD."
-	
-	# get user object 
-	$userInAzureAD = Get-AzureADUser -Filter "UserPrincipalName eq `'$AADUsername`'"
+Write-Output "Try to connect AzureAD."
+Connect-AzureAD -Credential $AzCredentials
 
-	$isOwner = Get-AzRoleAssignment -ObjectID $userInAzureAD.ObjectId | Where-Object { $_.RoleDefinitionName -eq "Owner"}
+Write-Output "Connected to AzureAD."
 
-	if ($isOwner.RoleDefinitionName -eq "Owner") {
-		Write-Output $($AADUsername + " has Owner role assigned")        
-	} 
-	else {
-		Write-Output "Missing Owner role."   
-		Throw
-	}
-}
-Catch {    
-	Write-Output  $($AADUsername + " does not have Owner role assigned")
+# get user object 
+$userInAzureAD = Get-AzureADUser -Filter "UserPrincipalName eq `'$AADUsername`'"
+
+$isOwner = Get-AzRoleAssignment -ObjectID $userInAzureAD.ObjectId | Where-Object { $_.RoleDefinitionId -eq "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"}
+
+if ($null -ne $isOwner) {
+	Write-Output $($AADUsername + " has Owner role assigned")        
+} 
+else {
+	Write-Output $($AADUsername + " does not have 'Owner' role assigned")
 }
 #endregion
 
 #region connect to Azure and check if admin on Azure AD 
-Try {
-	# this depends on the previous segment completeing 
-	$role = Get-AzureADDirectoryRole | Where-Object {$_.roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'}
-	$isMember = Get-AzureADDirectoryRoleMember -ObjectId $role.ObjectId | Get-AzureADUser | Where-Object {$_.UserPrincipalName -eq $AADUsername}
-	
-	if ($isMember.UserType -eq "Member") {
-		Write-Output $($AADUsername + " has " + $role.DisplayName + " role assigned")        
-	} 
-	else {
-		Write-Output "Missing Owner role."   
-		Throw
-	}
-}
-Catch {    
-	Write-Output  $($AADUsername + " does not have " + $role.DisplayName + " role assigned")
+# this depends on the previous segment completeing 
+$role = Get-AzureADDirectoryRole | Where-Object {$_.roleTemplateId -eq '62e90394-69f5-4237-9190-012177145e10'}
+$isMember = Get-AzureADDirectoryRoleMember -ObjectId $role.ObjectId | Where-Object { $_.ObjectId -eq $userInAzureAD.ObjectId }
+
+if ($null -ne $isMember) {
+	Write-Output $($AADUsername + " has " + $role.DisplayName + " role assigned")        
+} 
+else {
+	Write-Output $($AADUsername + " does not have 'Global Administrator' role assigned")
 }
 #endregion
 
@@ -151,22 +139,17 @@ foreach ($resourceProvider in $wvdResourceProviderNames) {
 
 #region check VNET
 Write-Output "Validating vNet and subnet..."
-Try {        
-	$VNET = Get-AzVirtualNetwork -name $existingVnetName
-	($VNET).AddressSpace.AddressPrefixes 
-	Write-Output $("Found the VNET " + $VNET.Name)   
-	
-	# subner 
-	If (($VNET).Subnets.Name -eq $existingSubnetName) {
+$VNET = Get-AzVirtualNetwork -name $existingVnetName
+if(  $null -ne $VNET ) {
+	Write-Output $("Found the VNET " + $VNET.Name + " with profixes " + $VNET.AddressSpace.AddressPrefixes)   
+
+	If (($VNET.Subnets).Name -contains $existingSubnetName) {
 		Write-Output $("Found the subnet " + $existingSubnetName)   
 	}
 	else {
-		Throw "Subnet not found!"
+		Write-Output $("Did not find the VNET " + $existingVnetName + " with subnet " + $existingSubnetName)     
+		throw  $("Did not find the VNET " + $existingVnetName + " with subnet " + $existingSubnetName)
 	}
-}
-Catch {                
-	Write-Output $("Did not find the VNET " + $VNET.name + " with subnet " + $existingSubnetName)     
-	throw  "Virtual network not found."
 }
 #endregion
 
@@ -179,28 +162,41 @@ foreach($url in $safeUrls) {
     $var = test-netconnection $url -port 443
 
     if ($var.TcpTestSucceeded) {
-    Write-Output "$url is reachable."
+    Write-Output "$url is reachable on port 443."
     } 
     else {
-        Write-Output "$url cannot be reached."   
-        Throw
+        Write-Output "$url cannot be reached on por 443."   
+        Throw "$url cannot be reached on por 443."   
     }    
 }
 
 $url = "kms.core.windows.net"
 $var = test-netconnection $url -port 1688
 if ($var.TcpTestSucceeded) {
-Write-Output "$url is reachable."
+	Write-Output "$url is reachable on port 1688."
 } 
 else {
-    Write-Output "$url cannot be reached."   
-    Throw
+    Write-Output "$url cannot be reached on port 1688."
+	Throw "$url cannot be reached on port 1688."
 }
 
 Write-Output ('End verification.')
 #endregion
 
-# Grant managed identity contributor role on subscription level
+# Grant WVDServicePrincipal managed identity contributor role on subscription level
 $identity = Get-AzUserAssignedIdentity -ResourceGroupName $ResourceGroupName -Name "WVDServicePrincipal"
-New-AzRoleAssignment -RoleDefinitionName "Contributor" -ObjectId $identity.PrincipalId -Scope "/subscriptions/$subscriptionId"
-Start-Sleep -Seconds 5
+if ($null -eq $identity) {
+	Write-Output $($ResourceGroupName + " does not contains WVDServicePrincipal.")
+	throw $($ResourceGroupName + " does not contains WVDServicePrincipal.")
+}
+
+$isContributor = Get-AzRoleAssignment -ObjectID $identity.PrincipalId | Where-Object { $_.RoleDefinitionId -eq "b24988ac-6180-42a0-ab88-20f7382dd24c"}
+
+if ($null -ne $isContributor) {
+	Write-Output "WVDServicePrincipal has Contributor role assigned"     
+} 
+else {
+	New-AzRoleAssignment -RoleDefinitionId "b24988ac-6180-42a0-ab88-20f7382dd24c" -ObjectId $identity.PrincipalId -Scope "/subscriptions/$subscriptionId"
+	Write-Output "WVDServicePrincipal has been assigned Contributor role"
+	Start-Sleep -Seconds 10
+}
